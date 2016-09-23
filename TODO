@@ -1,0 +1,2 @@
+* Add the debug error report message for each openssl calling and sm3 key path
+* Alloc and free the memory in crypt way to avoid memory info leak
