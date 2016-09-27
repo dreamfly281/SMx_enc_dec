@@ -1,5 +1,5 @@
-
-This project used for the Chinese National Algorithm SMx SM2, SM3, ...) implementation
+https://groups.google.com/forum/#!forum/smx_crypto  
+This project used for the ECC type China National Algorithm SM2, SM3, ...) implementation
 For any question and bug report, please contact with Yanbo Li dreamfly281@gmail.com
 
 --------------
@@ -24,3 +24,14 @@ uint16_t ntohs(uint16_t netshort); // Network to host
 Network byte order is big-endian. So, these functions mean:
 hton*: Host endian to big endian
 ntoh*: Big endian to host endian
+
+
+
+Community (Discussing and patch submit)
+---------------
+Subscribe to mailist smx_crypto@googlegroups.com
+by send email to smx_crypto+subscribe@googlegroups.com
+or access the google group directly via https://groups.google.com/forum/#!forum/smx_crypto
+
+Join Slash for IRC
+https://smx-crypto.slack.com
