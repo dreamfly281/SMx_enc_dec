@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 #include <time.h>
 #include <openssl/bn.h>
 #include <openssl/ec.h>
@@ -78,7 +79,7 @@ int sm2_test_case1()
 	}
         signature = malloc(sig_len);
 	if (signature == NULL)
-		goto err;
+		goto err_exit;
         ret = sm2_sign(sm2_ctx, NULL, digest, SM2_TEST_DIGEST_LEN, signature, &sig_len);
         if (ret) {
 		printf("Sign failed\n");
@@ -93,10 +94,10 @@ int sm2_test_case1()
 	}
 	printf("ECC Verify Pass\n");
 
-        sm2_exit(sm2_ctx);
-
 err_alloc:
         free(signature);
+err_exit:
+        sm2_exit(sm2_ctx);
 err:
 	return ret;
 }
@@ -159,7 +160,7 @@ static int sign_test_case1(void)
         sig_len = ECSDA_SIZE_LEN;
         signature = malloc(sig_len);
 	if (signature == NULL)
-		goto err;
+		goto err_exit;
         ret = sm2_sign(sm2_ctx, priv_key, digest, SM3_DIGEST_LEN, signature, &sig_len);
         if (ret) {
 		printf("Sign failed\n");
@@ -174,7 +175,34 @@ static int sign_test_case1(void)
 	}
 	printf("ECC Verify Pass\n");
 
+err_alloc:
+        free(signature);
+err_exit:
         sm2_exit(sm2_ctx);
+err:
+	return ret;
+}
+
+int sm2_sign_perf_test(unsigned long sm2_ctx)
+{
+	unsigned char digest[SM2_TEST_DIGEST_LEN];
+	unsigned char *signature = NULL;
+	unsigned int sig_len;
+        int i;
+        int ret = -1;
+
+        sig_len = ECSDA_SIZE_LEN;
+        signature = malloc(sig_len);
+	if (signature == NULL)
+		goto err;
+
+        ret = sm2_sign(sm2_ctx, NULL, digest, SM2_TEST_DIGEST_LEN, signature,
+                       &sig_len);
+
+        if (ret) {
+                printf("Sign failed\n");
+                goto err_alloc;
+        }
 
 err_alloc:
         free(signature);
@@ -182,26 +210,158 @@ err:
 	return ret;
 }
 
+int sm2_verify_perf_test(unsigned long sm2_ctx, int test_times)
+{
+	unsigned char digest[SM2_TEST_DIGEST_LEN];
+	unsigned char *signature = NULL;
+	unsigned int sig_len;
+        int i;
+        int ret = -1;
+
+        sig_len = ECSDA_SIZE_LEN;
+        signature = malloc(sig_len);
+	if (signature == NULL)
+		goto err_alloc;
+        ret = sm2_sign(sm2_ctx, NULL, digest, SM2_TEST_DIGEST_LEN, signature, &sig_len);
+        if (ret) {
+		printf("Sign failed\n");
+		goto err;
+	}
+
+        for (i = 0; i < test_times; i++) {
+                ret = sm2_verify(sm2_ctx, NULL, digest, SM2_TEST_DIGEST_LEN,
+                                 signature, ECSDA_SIZE_LEN);
+                if (ret) {
+                        printf("Verify failed\n");
+                        goto err;
+                }
+	}
+
+err:
+        free(signature);
+err_alloc:
+	return ret;
+}
+
+int sm2_sign_verify_perf_test(unsigned long sm2_ctx)
+{
+	unsigned char digest[SM2_TEST_DIGEST_LEN];
+	unsigned char *signature = NULL;
+	unsigned int sig_len;
+        int ret = -1;
+
+        sig_len = ECSDA_SIZE_LEN;
+        signature = malloc(sig_len);
+	if (signature == NULL)
+		goto err;
+        ret = sm2_sign(sm2_ctx, NULL, digest, SM2_TEST_DIGEST_LEN, signature, &sig_len);
+        if (ret) {
+		printf("Sign failed\n");
+		goto err_alloc;
+	}
+
+	if (sm2_verify(sm2_ctx, NULL, digest, SM2_TEST_DIGEST_LEN, signature,
+                       ECSDA_SIZE_LEN)) {
+		printf("Verify failed\n");
+		goto err_alloc;
+	}
+
+err_alloc:
+        free(signature);
+err:
+	return ret;
+}
+
+int sm3_perf_test(void)
+{
+        /* abcdedgh ... */
+        u8 input[64] = {0x61, 0x62, 0x63, 0x64, 0x61, 0x62, 0x63, 0x64,
+                        0x61, 0x62, 0x63, 0x64, 0x61, 0x62, 0x63, 0x64,
+                        0x61, 0x62, 0x63, 0x64, 0x61, 0x62, 0x63, 0x64,
+                        0x61, 0x62, 0x63, 0x64, 0x61, 0x62, 0x63, 0x64,
+                        0x61, 0x62, 0x63, 0x64, 0x61, 0x62, 0x63, 0x64,
+                        0x61, 0x62, 0x63, 0x64, 0x61, 0x62, 0x63, 0x64,
+                        0x61, 0x62, 0x63, 0x64, 0x61, 0x62, 0x63, 0x64,
+                        0x61, 0x62, 0x63, 0x64, 0x61, 0x62, 0x63, 0x64};
+	int len = 64;
+        /* u8 input[] = "abc"; */
+	/* int ilen = 3; */
+	u8 output[SM3_DIGEST_LEN];
+	int ret;
+
+	ret = sm3_hash(input, len, output, sizeof(output));
+        if (ret)
+                printf("SM3 digest failed\n");
+
+        return 0;
+}
+
 int main()
 {
+        unsigned long sm2_ctx;
+        struct timeval t0, t1;
+        int i, ret = 0;
+
 	CRYPTO_set_mem_debug_functions(0, 0, 0, 0, 0);
 	CRYPTO_mem_ctrl(CRYPTO_MEM_CHECK_ON);
 	ERR_load_crypto_strings();
 	RAND_seed(rnd_seed, sizeof(rnd_seed));
-
-        printf("-----SM2 test case with fake digest-----\n");
-	sm2_test_case1();
-
-        printf("-----SM3 test case-----\n");
-        sm3_test_case1();
-
-        printf("-----SM2 test case with pre hash-----\n");
-        sign_test_case1();
 
 	CRYPTO_cleanup_all_ex_data();
 	ERR_free_strings();
 	ERR_remove_state(0);
 	CRYPTO_mem_leaks_fp(stderr);
 
-	return 0;
+        printf("-----SM2 test case with fake digest-----\n");
+	sm2_test_case1();
+
+        printf("-----SM2 test case with pre hash-----\n");
+        sign_test_case1();
+
+
+        printf("-----SM3 test case-----\n");
+        sm3_test_case1();
+
+        printf("-----SM3 perf test case-----\n");
+        gettimeofday(&t0, NULL);
+        for (i = 0; i < 100000; i++) {
+                sm3_perf_test();
+        }
+        gettimeofday(&t1, NULL);
+        printf("Did %u calls in %.2g seconds\n", i, t1.tv_sec - t0.tv_sec + 1E-6 * (t1.tv_usec - t0.tv_usec));
+
+        ret = sm2_init(&sm2_ctx, NULL);
+        if (ret) {
+                printf("SM2 init failed\n");
+                goto err;
+        }
+
+        printf("-----SM2 sign perf test case-----\n");
+        gettimeofday(&t0, NULL);
+        for (i = 0; i < 10000; i++)
+                sm2_sign_perf_test(sm2_ctx);
+
+        gettimeofday(&t1, NULL);
+        printf("Did %u calls in %.2g seconds\n", i, t1.tv_sec - t0.tv_sec + 1E-6 * (t1.tv_usec - t0.tv_usec));
+
+        printf("-----SM2 verify perf test case-----\n");
+        gettimeofday(&t0, NULL);
+
+        i = 10000;
+        sm2_verify_perf_test(sm2_ctx, i);
+
+        gettimeofday(&t1, NULL);
+        printf("Did %u calls in %.2g seconds\n", i, t1.tv_sec - t0.tv_sec + 1E-6 * (t1.tv_usec - t0.tv_usec));
+
+        printf("-----SM2 sign&verify perf test case-----\n");
+        gettimeofday(&t0, NULL);
+        for (i = 0; i < 10000; i++)
+                sm2_sign_verify_perf_test(sm2_ctx);
+
+        gettimeofday(&t1, NULL);
+        printf("Did %u calls in %.2g seconds\n", i, t1.tv_sec - t0.tv_sec + 1E-6 * (t1.tv_usec - t0.tv_usec));
+
+        sm2_exit(sm2_ctx);
+err:
+	return ret;
 }
